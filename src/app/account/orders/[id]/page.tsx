@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+
 import {
   ArrowLeft,
   Loader2,
@@ -398,12 +398,11 @@ export default function OrderDetailPage() {
                   >
                     {msg.attachmentUrl && msg.attachmentType === "image" && (
                       <div className="mb-2">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={msg.attachmentUrl}
                           alt="Attachment"
-                          width={256}
-                          height={192}
-                          className="rounded-lg max-w-full h-auto cursor-pointer"
+                          className="rounded-lg max-w-[256px] h-auto cursor-pointer"
                           onClick={() =>
                             window.open(msg.attachmentUrl, "_blank")
                           }

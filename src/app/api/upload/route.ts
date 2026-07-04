@@ -39,12 +39,16 @@ export async function POST(request: NextRequest) {
     const filename = `attachments/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
 
     const blob = await put(filename, file, {
-      access: "public",
+      access: "private",
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: file.type,
     });
 
-    return NextResponse.json({ url: blob.url });
+    const fileId = filename.replace("attachments/", "").replace(`.${ext}`, "");
+    const serveUrl = `/api/upload/${fileId}.${ext}`;
+
+    return NextResponse.json({ url: serveUrl, blobUrl: blob.url });
   } catch {
     return NextResponse.json(
       { error: "Failed to upload file" },
