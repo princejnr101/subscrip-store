@@ -49,10 +49,9 @@ export interface Order {
 export interface SiteConfig {
   storeName: string;
   adminWhatsApp: string;
-  bankDetails: {
-    bankName: string;
-    accountName: string;
-    accountNumber: string;
+  momoDetails: {
+    momoName: string;
+    momoNumber: string;
     additionalInfo: string;
   };
   adminPassword: string;

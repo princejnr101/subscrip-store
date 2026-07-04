@@ -238,14 +238,14 @@ export default function PaymentPage() {
                     Payment Pending
                   </p>
                   <p className="text-amber-600 text-sm">
-                    Please make your bank transfer and enter the payment
-                    reference below to confirm.
+                    Please send your MTN MoMo payment and enter the
+                    transaction ID below to confirm.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Payment Reference / Transaction ID
+                    MoMo Transaction ID
                   </label>
                   <div className="relative">
                     <Upload className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -253,7 +253,7 @@ export default function PaymentPage() {
                       type="text"
                       value={paymentRef}
                       onChange={(e) => setPaymentRef(e.target.value)}
-                      placeholder="Enter your payment reference"
+                      placeholder="Enter your MoMo transaction ID"
                       className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       required
                     />

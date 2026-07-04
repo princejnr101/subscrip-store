@@ -75,7 +75,7 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Secure Payment</h3>
-                <p className="text-sm text-gray-500">Safe bank transfer</p>
+                <p className="text-sm text-gray-500">MTN Mobile Money</p>
               </div>
             </div>
             <div className="flex items-center gap-4 justify-center md:justify-end">
@@ -157,8 +157,8 @@ export default function Home() {
                 Make Payment
               </h3>
               <p className="text-gray-500">
-                Transfer the amount to our bank account and confirm your payment
-                with the reference.
+                Send payment via MTN Mobile Money and confirm with your
+                transaction ID.
               </p>
             </div>
             <div className="text-center">

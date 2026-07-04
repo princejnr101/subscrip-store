@@ -269,8 +269,8 @@ export default function OrderPage() {
               </button>
 
               <p className="text-xs text-gray-400 text-center">
-                After placing the order, you&apos;ll receive bank transfer
-                details for payment.
+                After placing the order, you&apos;ll receive MTN MoMo payment
+                details.
               </p>
             </form>
           </div>

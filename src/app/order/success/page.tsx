@@ -8,7 +8,7 @@ import {
   Copy,
   MessageCircle,
   ArrowRight,
-  Banknote,
+  Smartphone,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -18,15 +18,13 @@ function SuccessContent() {
   const whatsappUrl = searchParams.get("whatsappUrl") || "";
   const [copied, setCopied] = useState(false);
 
-  const bankName =
-    process.env.NEXT_PUBLIC_BANK_NAME || "Your Bank Name";
-  const accountName =
-    process.env.NEXT_PUBLIC_ACCOUNT_NAME || "Your Account Name";
-  const accountNumber =
-    process.env.NEXT_PUBLIC_ACCOUNT_NUMBER || "0000000000";
-  const bankInfo =
-    process.env.NEXT_PUBLIC_BANK_INFO ||
-    "Please include your Order ID as payment reference";
+  const momoName =
+    process.env.NEXT_PUBLIC_MOMO_NAME || "Your MoMo Name";
+  const momoNumber =
+    process.env.NEXT_PUBLIC_MOMO_NUMBER || "0000000000";
+  const momoInfo =
+    process.env.NEXT_PUBLIC_MOMO_INFO ||
+    "Please include your Order ID as payment reference when sending";
 
   function copyOrderId() {
     navigator.clipboard.writeText(orderId);
@@ -43,8 +41,8 @@ function SuccessContent() {
             Order Placed Successfully!
           </h1>
           <p className="text-gray-500">
-            Your order has been received. Please complete the payment to activate
-            your subscription.
+            Your order has been received. Please complete the payment via MTN
+            Mobile Money to activate your subscription.
           </p>
         </div>
 
@@ -71,25 +69,29 @@ function SuccessContent() {
           </div>
         </div>
 
-        {/* Bank Details */}
+        {/* MoMo Payment Details */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Banknote className="w-5 h-5 text-green-600" />
-            Payment Details
+            <Smartphone className="w-5 h-5 text-yellow-500" />
+            MTN Mobile Money Payment
           </h2>
+
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl mb-4">
+            <p className="text-yellow-800 text-sm font-medium">
+              Send payment via MTN MoMo to:
+            </p>
+          </div>
 
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500">Bank Name</span>
-              <span className="font-medium text-gray-900">{bankName}</span>
+              <span className="text-gray-500">MoMo Name</span>
+              <span className="font-medium text-gray-900">{momoName}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500">Account Name</span>
-              <span className="font-medium text-gray-900">{accountName}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500">Account Number</span>
-              <span className="font-medium text-gray-900">{accountNumber}</span>
+              <span className="text-gray-500">MoMo Number</span>
+              <span className="font-bold text-gray-900 text-lg">
+                {momoNumber}
+              </span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-gray-500">Reference</span>
@@ -100,7 +102,7 @@ function SuccessContent() {
           </div>
 
           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-            {bankInfo}
+            {momoInfo}
           </div>
         </div>
 
@@ -136,9 +138,10 @@ function SuccessContent() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-400">
-            After payment, click &ldquo;Confirm Payment&rdquo; or notify us on
-            WhatsApp with your payment reference. We&apos;ll activate your
-            subscription as soon as payment is verified.
+            After sending your MoMo payment, click &ldquo;Confirm
+            Payment&rdquo; or notify us on WhatsApp with your transaction ID.
+            We&apos;ll activate your subscription as soon as payment is
+            verified.
           </p>
         </div>
       </div>
