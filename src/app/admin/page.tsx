@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Package,
   Clock,
@@ -15,6 +16,7 @@ import {
   Users,
   AlertCircle,
   ChevronDown,
+  BarChart3,
 } from "lucide-react";
 import { Order, OrderStatus, PaymentStatus } from "@/lib/types";
 
@@ -153,6 +155,13 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/admin/analytics"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </Link>
             <button
               onClick={fetchOrders}
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
