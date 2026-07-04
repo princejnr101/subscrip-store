@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Menu, X, ShoppingBag } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Menu, X, ShoppingBag, User } from "lucide-react";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [clientName, setClientName] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("client_token");
+    const name = localStorage.getItem("client_name");
+    setLoggedIn(!!token);
+    setClientName(name || "");
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
@@ -39,6 +48,23 @@ export default function Header() {
             >
               Track Order
             </Link>
+            {loggedIn ? (
+              <Link
+                href="/account"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors text-sm"
+              >
+                <User className="w-4 h-4" />
+                {clientName || "My Account"}
+              </Link>
+            ) : (
+              <Link
+                href="/account/login"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors text-sm"
+              >
+                <User className="w-4 h-4" />
+                Sign In
+              </Link>
+            )}
           </nav>
 
           <button
@@ -77,6 +103,25 @@ export default function Header() {
           >
             Track Order
           </Link>
+          {loggedIn ? (
+            <Link
+              href="/account"
+              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium"
+              onClick={() => setMobileOpen(false)}
+            >
+              <User className="w-4 h-4" />
+              {clientName || "My Account"}
+            </Link>
+          ) : (
+            <Link
+              href="/account/login"
+              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium"
+              onClick={() => setMobileOpen(false)}
+            >
+              <User className="w-4 h-4" />
+              Sign In
+            </Link>
+          )}
         </div>
       )}
     </header>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,8 +17,9 @@ import {
   AlertCircle,
   ChevronDown,
   BarChart3,
+  Send,
 } from "lucide-react";
-import { Order, OrderStatus, PaymentStatus } from "@/lib/types";
+import { Order, OrderStatus, PaymentStatus, Message } from "@/lib/types";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -27,6 +28,10 @@ export default function AdminDashboard() {
   const [filter, setFilter] = useState<string>("all");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [newMessage, setNewMessage] = useState<Record<string, string>>({});
+  const [sendingMessage, setSendingMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchOrders = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
@@ -102,6 +107,70 @@ export default function AdminDashboard() {
     const phone = order.customerWhatsApp.replace(/[^0-9]/g, "");
     const message = `Hi ${order.customerName}! Your payment for ${order.productName} (${order.planName}) has been confirmed. Your subscription is now being activated. Thank you!`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  }
+
+  const fetchMessages = useCallback(
+    async (orderId: string) => {
+      const token = localStorage.getItem("admin_token");
+      if (!token) return;
+
+      try {
+        const res = await fetch(`/api/messages?orderId=${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages((prev) => ({ ...prev, [orderId]: data.messages || [] }));
+        }
+      } catch {
+        console.error("Failed to fetch messages");
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (expandedOrder) {
+      const order = orders.find((o) => o.id === expandedOrder);
+      if (order?.clientId) {
+        fetchMessages(expandedOrder);
+        const interval = setInterval(
+          () => fetchMessages(expandedOrder),
+          10000
+        );
+        return () => clearInterval(interval);
+      }
+    }
+  }, [expandedOrder, orders, fetchMessages]);
+
+  async function sendAdminMessage(orderId: string) {
+    const token = localStorage.getItem("admin_token");
+    const text = (newMessage[orderId] || "").trim();
+    if (!token || !text) return;
+
+    setSendingMessage(orderId);
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderId, text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages((prev) => ({
+          ...prev,
+          [orderId]: [...(prev[orderId] || []), data.message],
+        }));
+        setNewMessage((prev) => ({ ...prev, [orderId]: "" }));
+      }
+    } catch {
+      console.error("Failed to send message");
+    } finally {
+      setSendingMessage(null);
+    }
   }
 
   function logout() {
@@ -452,6 +521,95 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {/* In-site Messages */}
+                    {order.clientId && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <MessageCircle className="w-4 h-4 text-indigo-500" />
+                          Messages with {order.customerName}
+                        </h3>
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          <div className="h-48 overflow-y-auto p-3 space-y-2">
+                            {(messages[order.id] || []).length === 0 ? (
+                              <p className="text-gray-400 text-sm text-center py-4">
+                                No messages yet
+                              </p>
+                            ) : (
+                              (messages[order.id] || []).map((msg) => (
+                                <div
+                                  key={msg.id}
+                                  className={`flex ${
+                                    msg.senderType === "admin"
+                                      ? "justify-end"
+                                      : "justify-start"
+                                  }`}
+                                >
+                                  <div
+                                    className={`max-w-[75%] rounded-xl px-3 py-2 ${
+                                      msg.senderType === "admin"
+                                        ? "bg-indigo-600 text-white rounded-br-sm"
+                                        : "bg-gray-100 text-gray-900 rounded-bl-sm"
+                                    }`}
+                                  >
+                                    <p className="text-sm">{msg.text}</p>
+                                    <p
+                                      className={`text-xs mt-0.5 ${
+                                        msg.senderType === "admin"
+                                          ? "text-indigo-200"
+                                          : "text-gray-400"
+                                      }`}
+                                    >
+                                      {new Date(
+                                        msg.createdAt
+                                      ).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                            <div ref={messagesEndRef} />
+                          </div>
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              sendAdminMessage(order.id);
+                            }}
+                            className="p-2 border-t border-gray-100 flex gap-2"
+                          >
+                            <input
+                              type="text"
+                              value={newMessage[order.id] || ""}
+                              onChange={(e) =>
+                                setNewMessage((prev) => ({
+                                  ...prev,
+                                  [order.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Type a message to client..."
+                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <button
+                              type="submit"
+                              disabled={
+                                sendingMessage === order.id ||
+                                !(newMessage[order.id] || "").trim()
+                              }
+                              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-colors"
+                            >
+                              {sendingMessage === order.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { getProductBySlug } from "@/lib/products";
@@ -29,6 +29,27 @@ export default function OrderPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const name = localStorage.getItem("client_name") || "";
+    const token = localStorage.getItem("client_token");
+    if (token && name) {
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.client) {
+            setFormData({
+              name: data.client.name,
+              email: data.client.email,
+              whatsapp: data.client.whatsapp,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   if (!product) {
     return (
@@ -61,9 +82,17 @@ export default function OrderPage() {
     setError("");
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const clientToken = localStorage.getItem("client_token");
+      if (clientToken) {
+        headers["Authorization"] = `Bearer ${clientToken}`;
+      }
+
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           productId: product!.id,
           productName: product!.name,

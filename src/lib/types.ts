@@ -38,12 +38,32 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   customerWhatsApp: string;
+  clientId?: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentReference: string;
   adminNotes: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
+export interface Message {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderType: "client" | "admin";
+  senderName: string;
+  text: string;
+  createdAt: string;
 }
 
 export interface SiteConfig {
