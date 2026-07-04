@@ -63,6 +63,7 @@ export default function AccountPage() {
     localStorage.removeItem("client_token");
     localStorage.removeItem("client_name");
     localStorage.removeItem("client_id");
+    window.dispatchEvent(new Event("auth-changed"));
     router.push("/account/login");
   }
 
