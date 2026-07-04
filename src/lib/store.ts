@@ -66,6 +66,7 @@ export async function createOrder(
   await put(orderPath(newOrder.id), JSON.stringify(newOrder), {
     access: "private",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
   });
 
@@ -90,6 +91,7 @@ export async function updateOrder(
   await put(orderPath(id), JSON.stringify(updated), {
     access: "private",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
   });
 
