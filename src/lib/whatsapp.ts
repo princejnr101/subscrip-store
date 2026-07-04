@@ -24,6 +24,13 @@ export function buildAdminChatLink(order: Order): string {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
+export function buildPaymentSubmittedNotification(order: Order, transactionId: string): string {
+  const message = `Payment Submitted!\n\nOrder ID: ${order.id}\nProduct: ${order.productName}\nPlan: ${order.planName} (${order.planDuration})\nAmount: $${order.price.toFixed(2)} ${order.currency}\n\nCustomer: ${order.customerName}\nWhatsApp: ${order.customerWhatsApp}\n\nMoMo Transaction ID: ${transactionId}\n\nPlease verify and confirm this payment.`;
+
+  const phone = siteConfig.adminWhatsApp.replace(/[^0-9]/g, "");
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
 export function buildPaymentConfirmationLink(order: Order): string {
   const phone = order.customerWhatsApp.replace(/[^0-9]/g, "");
   const message = `Hi ${order.customerName}! Your payment for ${order.productName} (${order.planName}) has been confirmed. Your subscription is now being activated. Thank you for your order! - ${siteConfig.storeName}`;

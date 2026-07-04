@@ -67,6 +67,10 @@ export default function PaymentPage() {
       const data = await res.json();
       setOrder(data.order);
       setSuccess(true);
+
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, "_blank");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

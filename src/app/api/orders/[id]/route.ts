@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrderById, updateOrder } from "@/lib/store";
+import { buildPaymentSubmittedNotification } from "@/lib/whatsapp";
 import { siteConfig } from "@/lib/config";
 
 export async function GET(
@@ -51,7 +52,20 @@ export async function PATCH(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ order });
+    const response: Record<string, unknown> = { order };
+
+    if (
+      !isAdminUpdate &&
+      body.paymentStatus === "pending_confirmation" &&
+      body.paymentReference
+    ) {
+      response.whatsappUrl = buildPaymentSubmittedNotification(
+        order,
+        body.paymentReference
+      );
+    }
+
+    return NextResponse.json(response);
   } catch {
     return NextResponse.json(
       { error: "Failed to update order" },
