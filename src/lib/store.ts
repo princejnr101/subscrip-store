@@ -1,4 +1,4 @@
-import { put, list, del } from "@vercel/blob";
+import { put, list, del, get } from "@vercel/blob";
 import { Order } from "./types";
 
 const ORDERS_BLOB_PREFIX = "orders/";
@@ -7,16 +7,30 @@ function orderPath(id: string): string {
   return `${ORDERS_BLOB_PREFIX}${id}.json`;
 }
 
+async function readBlob(url: string): Promise<Order> {
+  const result = await get(url, { access: "private" });
+  if (!result || !result.stream) throw new Error("Blob not found");
+  const reader = result.stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let done = false;
+  while (!done) {
+    const read = await reader.read();
+    done = read.done;
+    if (read.value) chunks.push(read.value);
+  }
+  const text = new TextDecoder().decode(
+    Buffer.concat(chunks)
+  );
+  return JSON.parse(text) as Order;
+}
+
 export async function getOrders(): Promise<Order[]> {
   try {
     const { blobs } = await list({ prefix: ORDERS_BLOB_PREFIX });
     if (blobs.length === 0) return [];
 
     const orders = await Promise.all(
-      blobs.map(async (blob) => {
-        const res = await fetch(blob.downloadUrl);
-        return (await res.json()) as Order;
-      })
+      blobs.map(async (blob) => readBlob(blob.url))
     );
 
     return orders.sort(
@@ -33,8 +47,7 @@ export async function getOrderById(id: string): Promise<Order | undefined> {
     const { blobs } = await list({ prefix: orderPath(id) });
     if (blobs.length === 0) return undefined;
 
-    const res = await fetch(blobs[0].downloadUrl);
-    return (await res.json()) as Order;
+    return await readBlob(blobs[0].url);
   } catch {
     return undefined;
   }
@@ -51,7 +64,7 @@ export async function createOrder(
   };
 
   await put(orderPath(newOrder.id), JSON.stringify(newOrder), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     contentType: "application/json",
   });
@@ -75,7 +88,7 @@ export async function updateOrder(
   };
 
   await put(orderPath(id), JSON.stringify(updated), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     contentType: "application/json",
   });
