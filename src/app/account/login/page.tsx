@@ -33,6 +33,7 @@ export default function LoginPage() {
       localStorage.setItem("client_token", data.token);
       localStorage.setItem("client_name", data.client.name);
       localStorage.setItem("client_id", data.client.id);
+      window.dispatchEvent(new Event("auth-changed"));
       router.push("/account");
     } catch {
       setError("Something went wrong");

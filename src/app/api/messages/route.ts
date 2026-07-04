@@ -46,11 +46,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { orderId, text } = body;
+    const { orderId, text, attachmentUrl, attachmentType } = body;
 
-    if (!orderId || !text) {
+    if (!orderId || (!text && !attachmentUrl)) {
       return NextResponse.json(
-        { error: "orderId and text are required" },
+        { error: "orderId and text or attachment are required" },
         { status: 400 }
       );
     }
@@ -90,7 +90,9 @@ export async function POST(request: NextRequest) {
       senderId,
       senderType,
       senderName,
-      text,
+      text: text || "",
+      attachmentUrl,
+      attachmentType,
     });
 
     return NextResponse.json({ message }, { status: 201 });

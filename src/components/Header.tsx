@@ -1,20 +1,73 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { Menu, X, ShoppingBag, User } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Menu, X, ShoppingBag, User, Bell } from "lucide-react";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [clientName, setClientName] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
+  const checkAuth = useCallback(() => {
     const token = localStorage.getItem("client_token");
     const name = localStorage.getItem("client_name");
     setLoggedIn(!!token);
     setClientName(name || "");
   }, []);
+
+  useEffect(() => {
+    checkAuth();
+
+    function onStorage(e: StorageEvent) {
+      if (e.key === "client_token" || e.key === "client_name") {
+        checkAuth();
+      }
+    }
+
+    function onAuthChange() {
+      checkAuth();
+    }
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("auth-changed", onAuthChange);
+
+    const interval = setInterval(checkAuth, 2000);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("auth-changed", onAuthChange);
+      clearInterval(interval);
+    };
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setUnreadCount(0);
+      return;
+    }
+
+    async function fetchUnread() {
+      const token = localStorage.getItem("client_token");
+      if (!token) return;
+      try {
+        const res = await fetch("/api/messages/unread", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, [loggedIn]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
@@ -49,13 +102,26 @@ export default function Header() {
               Track Order
             </Link>
             {loggedIn ? (
-              <Link
-                href="/account"
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors text-sm"
-              >
-                <User className="w-4 h-4" />
-                {clientName || "My Account"}
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/account"
+                  className="relative p-2 text-gray-600 hover:text-indigo-600 transition-colors"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  href="/account"
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors text-sm"
+                >
+                  <User className="w-4 h-4" />
+                  {clientName || "My Account"}
+                </Link>
+              </div>
             ) : (
               <Link
                 href="/account/login"
@@ -111,6 +177,11 @@ export default function Header() {
             >
               <User className="w-4 h-4" />
               {clientName || "My Account"}
+              {unreadCount > 0 && (
+                <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           ) : (
             <Link

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   Loader2,
@@ -12,6 +13,9 @@ import {
   AlertCircle,
   RefreshCw,
   MessageCircle,
+  ImageIcon,
+  Mic,
+  Square,
 } from "lucide-react";
 import { Order, Message } from "@/lib/types";
 
@@ -24,7 +28,13 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const prevMessageCountRef = useRef(0);
 
   const fetchData = useCallback(async () => {
     const token = localStorage.getItem("client_token");
@@ -53,7 +63,7 @@ export default function OrderDetailPage() {
         setMessages(messagesData.messages || []);
       }
     } catch {
-      console.error("Failed to fetch data");
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -61,12 +71,15 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > prevMessageCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessageCountRef.current = messages.length;
   }, [messages]);
 
   async function sendMessage(e: React.FormEvent) {
@@ -93,9 +106,137 @@ export default function OrderDetailPage() {
         setNewMessage("");
       }
     } catch {
-      console.error("Failed to send message");
+      // ignore
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const token = localStorage.getItem("client_token");
+    if (!token) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json();
+        alert(err.error || "Upload failed");
+        return;
+      }
+
+      const { url } = await uploadRes.json();
+
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId,
+          text: "",
+          attachmentUrl: url,
+          attachmentType: "image",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages((prev) => [...prev, data.message]);
+      }
+    } catch {
+      alert("Failed to upload image");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function toggleRecording() {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        if (audioBlob.size === 0) return;
+
+        const token = localStorage.getItem("client_token");
+        if (!token) return;
+
+        setUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append(
+            "file",
+            new File([audioBlob], "voice.webm", { type: "audio/webm" })
+          );
+
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+
+          if (uploadRes.ok) {
+            const { url } = await uploadRes.json();
+            const res = await fetch("/api/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                orderId,
+                text: "",
+                attachmentUrl: url,
+                attachmentType: "voice",
+              }),
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              setMessages((prev) => [...prev, data.message]);
+            }
+          }
+        } catch {
+          // ignore
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+    } catch {
+      alert("Could not access microphone");
     }
   }
 
@@ -134,7 +275,6 @@ export default function OrderDetailPage() {
   return (
     <div className="py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link
             href="/account"
@@ -148,7 +288,6 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* Order Info */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">
@@ -195,7 +334,6 @@ export default function OrderDetailPage() {
             )}
           </div>
 
-          {/* Progress tracker */}
           <div className="mt-6 pt-4 border-t border-gray-100">
             <p className="text-sm font-medium text-gray-700 mb-3">
               Order Progress
@@ -206,13 +344,12 @@ export default function OrderDetailPage() {
                 const currentIdx = steps.indexOf(order.status);
                 const isActive = i <= currentIdx && order.status !== "cancelled";
                 return (
-                  <div key={step} className="flex-1 flex items-center gap-2">
+                  <div key={step} className="flex-1">
                     <div
                       className={`w-full h-2 rounded-full ${
                         isActive ? "bg-indigo-500" : "bg-gray-200"
                       }`}
                     />
-                    {i < steps.length - 1 && <div className="w-0" />}
                   </div>
                 );
               })}
@@ -225,14 +362,14 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-indigo-500" />
             <h2 className="font-semibold text-gray-900">Messages</h2>
             <span className="text-xs text-gray-400">
-              Chat with the seller about your order
+              Live chat with the seller
             </span>
+            <div className="ml-auto w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           </div>
 
           <div className="h-80 overflow-y-auto p-4 space-y-3 bg-gray-50">
@@ -259,7 +396,30 @@ export default function OrderDetailPage() {
                         : "bg-white border border-gray-200 text-gray-900 rounded-bl-md"
                     }`}
                   >
-                    <p className="text-sm">{msg.text}</p>
+                    {msg.attachmentUrl && msg.attachmentType === "image" && (
+                      <div className="mb-2">
+                        <Image
+                          src={msg.attachmentUrl}
+                          alt="Attachment"
+                          width={256}
+                          height={192}
+                          className="rounded-lg max-w-full h-auto cursor-pointer"
+                          onClick={() =>
+                            window.open(msg.attachmentUrl, "_blank")
+                          }
+                        />
+                      </div>
+                    )}
+                    {msg.attachmentUrl && msg.attachmentType === "voice" && (
+                      <div className="mb-2">
+                        <audio
+                          controls
+                          src={msg.attachmentUrl}
+                          className="max-w-full"
+                        />
+                      </div>
+                    )}
+                    {msg.text && <p className="text-sm">{msg.text}</p>}
                     <p
                       className={`text-xs mt-1 ${
                         msg.senderType === "client"
@@ -282,18 +442,58 @@ export default function OrderDetailPage() {
 
           <form
             onSubmit={sendMessage}
-            className="p-3 border-t border-gray-100 flex gap-2"
+            className="p-3 border-t border-gray-100 flex gap-2 items-center"
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+              title="Send image"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={uploading}
+              className={`p-2.5 rounded-xl transition-colors ${
+                recording
+                  ? "text-red-600 bg-red-50 hover:bg-red-100 animate-pulse"
+                  : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+              }`}
+              title={recording ? "Stop recording" : "Record voice"}
+            >
+              {recording ? (
+                <Square className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
             <input
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              placeholder={
+                uploading
+                  ? "Uploading..."
+                  : recording
+                    ? "Recording..."
+                    : "Type a message..."
+              }
+              disabled={uploading || recording}
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:bg-gray-100"
             />
             <button
               type="submit"
-              disabled={sending || !newMessage.trim()}
+              disabled={sending || !newMessage.trim() || uploading || recording}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
             >
               {sending ? (

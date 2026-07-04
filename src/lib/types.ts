@@ -63,6 +63,8 @@ export interface Message {
   senderType: "client" | "admin";
   senderName: string;
   text: string;
+  attachmentUrl?: string;
+  attachmentType?: "image" | "voice";
   createdAt: string;
 }
 

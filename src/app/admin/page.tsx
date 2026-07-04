@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Package,
   Clock,
@@ -18,6 +19,8 @@ import {
   ChevronDown,
   BarChart3,
   Send,
+  ImageIcon,
+  Bell,
 } from "lucide-react";
 import { Order, OrderStatus, PaymentStatus, Message } from "@/lib/types";
 
@@ -31,7 +34,10 @@ export default function AdminDashboard() {
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [newMessage, setNewMessage] = useState<Record<string, string>>({});
   const [sendingMessage, setSendingMessage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const fetchOrders = useCallback(async () => {
     const token = localStorage.getItem("admin_token");
@@ -54,7 +60,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       setOrders(data.orders || []);
     } catch {
-      console.error("Failed to fetch orders");
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -62,9 +68,31 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 30000);
+    const interval = setInterval(fetchOrders, 15000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
+
+  useEffect(() => {
+    async function fetchUnread() {
+      const token = localStorage.getItem("admin_token");
+      if (!token) return;
+      try {
+        const res = await fetch("/api/messages/unread", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function updateOrderStatus(
     orderId: string,
@@ -91,7 +119,7 @@ export default function AdminDashboard() {
         );
       }
     } catch {
-      console.error("Failed to update order");
+      // ignore
     } finally {
       setUpdatingOrder(null);
     }
@@ -123,7 +151,7 @@ export default function AdminDashboard() {
           setMessages((prev) => ({ ...prev, [orderId]: data.messages || [] }));
         }
       } catch {
-        console.error("Failed to fetch messages");
+        // ignore
       }
     },
     []
@@ -136,7 +164,7 @@ export default function AdminDashboard() {
         fetchMessages(expandedOrder);
         const interval = setInterval(
           () => fetchMessages(expandedOrder),
-          10000
+          3000
         );
         return () => clearInterval(interval);
       }
@@ -167,9 +195,62 @@ export default function AdminDashboard() {
         setNewMessage((prev) => ({ ...prev, [orderId]: "" }));
       }
     } catch {
-      console.error("Failed to send message");
+      // ignore
     } finally {
       setSendingMessage(null);
+    }
+  }
+
+  async function handleAdminImageUpload(
+    orderId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const token = localStorage.getItem("admin_token");
+    if (!token) return;
+
+    setUploading(orderId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (uploadRes.ok) {
+        const { url } = await uploadRes.json();
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            orderId,
+            text: "",
+            attachmentUrl: url,
+            attachmentType: "image",
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages((prev) => ({
+            ...prev,
+            [orderId]: [...(prev[orderId] || []), data.message],
+          }));
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setUploading(null);
+      const input = fileInputRefs.current[orderId];
+      if (input) input.value = "";
     }
   }
 
@@ -224,6 +305,12 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {unreadCount > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium">
+                <Bell className="w-4 h-4" />
+                {unreadCount} message{unreadCount > 1 ? "s" : ""}
+              </div>
+            )}
             <Link
               href="/admin/analytics"
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium"
@@ -430,7 +517,6 @@ export default function AdminDashboard() {
                           Actions
                         </h3>
                         <div className="space-y-2">
-                          {/* WhatsApp Chat */}
                           <a
                             href={getWhatsAppLink(order)}
                             target="_blank"
@@ -441,7 +527,6 @@ export default function AdminDashboard() {
                             Message on WhatsApp
                           </a>
 
-                          {/* Order Status */}
                           <div className="flex gap-2">
                             <select
                               value={order.status}
@@ -478,7 +563,6 @@ export default function AdminDashboard() {
                             </select>
                           </div>
 
-                          {/* Quick Actions */}
                           {order.paymentStatus === "pending_confirmation" && (
                             <div className="flex gap-2">
                               <button
@@ -488,7 +572,8 @@ export default function AdminDashboard() {
                                     status: "processing",
                                   });
                                 }}
-                                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors"
+                                disabled={updatingOrder === order.id}
+                                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                               >
                                 <CheckCircle className="w-4 h-4" />
                                 Confirm Payment
@@ -499,7 +584,8 @@ export default function AdminDashboard() {
                                     paymentStatus: "rejected",
                                   })
                                 }
-                                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors"
+                                disabled={updatingOrder === order.id}
+                                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                               >
                                 <XCircle className="w-4 h-4" />
                                 Reject
@@ -528,9 +614,10 @@ export default function AdminDashboard() {
                         <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                           <MessageCircle className="w-4 h-4 text-indigo-500" />
                           Messages with {order.customerName}
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                         </h3>
                         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                          <div className="h-48 overflow-y-auto p-3 space-y-2">
+                          <div className="h-64 overflow-y-auto p-3 space-y-2">
                             {(messages[order.id] || []).length === 0 ? (
                               <p className="text-gray-400 text-sm text-center py-4">
                                 No messages yet
@@ -552,7 +639,37 @@ export default function AdminDashboard() {
                                         : "bg-gray-100 text-gray-900 rounded-bl-sm"
                                     }`}
                                   >
-                                    <p className="text-sm">{msg.text}</p>
+                                    {msg.attachmentUrl &&
+                                      msg.attachmentType === "image" && (
+                                        <div className="mb-1">
+                                          <Image
+                                            src={msg.attachmentUrl}
+                                            alt="Attachment"
+                                            width={200}
+                                            height={150}
+                                            className="rounded-lg max-w-full h-auto cursor-pointer"
+                                            onClick={() =>
+                                              window.open(
+                                                msg.attachmentUrl,
+                                                "_blank"
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      )}
+                                    {msg.attachmentUrl &&
+                                      msg.attachmentType === "voice" && (
+                                        <div className="mb-1">
+                                          <audio
+                                            controls
+                                            src={msg.attachmentUrl}
+                                            className="max-w-full h-8"
+                                          />
+                                        </div>
+                                      )}
+                                    {msg.text && (
+                                      <p className="text-sm">{msg.text}</p>
+                                    )}
                                     <p
                                       className={`text-xs mt-0.5 ${
                                         msg.senderType === "admin"
@@ -578,8 +695,30 @@ export default function AdminDashboard() {
                               e.preventDefault();
                               sendAdminMessage(order.id);
                             }}
-                            className="p-2 border-t border-gray-100 flex gap-2"
+                            className="p-2 border-t border-gray-100 flex gap-2 items-center"
                           >
+                            <input
+                              ref={(el) => {
+                                fileInputRefs.current[order.id] = el;
+                              }}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) =>
+                                handleAdminImageUpload(order.id, e)
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                fileInputRefs.current[order.id]?.click()
+                              }
+                              disabled={uploading === order.id}
+                              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title="Send image"
+                            >
+                              <ImageIcon className="w-4 h-4" />
+                            </button>
                             <input
                               type="text"
                               value={newMessage[order.id] || ""}
@@ -589,14 +728,20 @@ export default function AdminDashboard() {
                                   [order.id]: e.target.value,
                                 }))
                               }
-                              placeholder="Type a message to client..."
-                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder={
+                                uploading === order.id
+                                  ? "Uploading..."
+                                  : "Type a message to client..."
+                              }
+                              disabled={uploading === order.id}
+                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
                             />
                             <button
                               type="submit"
                               disabled={
                                 sendingMessage === order.id ||
-                                !(newMessage[order.id] || "").trim()
+                                !(newMessage[order.id] || "").trim() ||
+                                uploading === order.id
                               }
                               className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-colors"
                             >
