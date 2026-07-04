@@ -65,10 +65,9 @@ export async function POST(request: NextRequest) {
     const whatsappUrl = buildWhatsAppOrderNotification(order);
 
     return NextResponse.json({ order, whatsappUrl }, { status: 201 });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+  } catch {
     return NextResponse.json(
-      { error: "Failed to create order", details: message },
+      { error: "Failed to create order" },
       { status: 500 }
     );
   }
