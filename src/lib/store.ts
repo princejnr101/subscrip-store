@@ -1,69 +1,96 @@
-import fs from "fs";
-import path from "path";
+import { put, list, del } from "@vercel/blob";
 import { Order } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const ORDERS_FILE = path.join(DATA_DIR, "orders.json");
+const ORDERS_BLOB_PREFIX = "orders/";
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function orderPath(id: string): string {
+  return `${ORDERS_BLOB_PREFIX}${id}.json`;
+}
+
+export async function getOrders(): Promise<Order[]> {
+  try {
+    const { blobs } = await list({ prefix: ORDERS_BLOB_PREFIX });
+    if (blobs.length === 0) return [];
+
+    const orders = await Promise.all(
+      blobs.map(async (blob) => {
+        const res = await fetch(blob.downloadUrl);
+        return (await res.json()) as Order;
+      })
+    );
+
+    return orders.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  } catch {
+    return [];
   }
-  if (!fs.existsSync(ORDERS_FILE)) {
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify([], null, 2));
+}
+
+export async function getOrderById(id: string): Promise<Order | undefined> {
+  try {
+    const { blobs } = await list({ prefix: orderPath(id) });
+    if (blobs.length === 0) return undefined;
+
+    const res = await fetch(blobs[0].downloadUrl);
+    return (await res.json()) as Order;
+  } catch {
+    return undefined;
   }
 }
 
-export function getOrders(): Order[] {
-  ensureDataDir();
-  const data = fs.readFileSync(ORDERS_FILE, "utf-8");
-  return JSON.parse(data);
-}
-
-export function getOrderById(id: string): Order | undefined {
-  const orders = getOrders();
-  return orders.find((o) => o.id === id);
-}
-
-export function createOrder(
+export async function createOrder(
   order: Omit<Order, "id" | "createdAt" | "updatedAt">
-): Order {
-  const orders = getOrders();
+): Promise<Order> {
   const newOrder: Order = {
     ...order,
     id: `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  orders.unshift(newOrder);
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+
+  await put(orderPath(newOrder.id), JSON.stringify(newOrder), {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "application/json",
+  });
+
   return newOrder;
 }
 
-export function updateOrder(
+export async function updateOrder(
   id: string,
   updates: Partial<Order>
-): Order | null {
-  const orders = getOrders();
-  const index = orders.findIndex((o) => o.id === id);
-  if (index === -1) return null;
+): Promise<Order | null> {
+  const existing = await getOrderById(id);
+  if (!existing) return null;
 
-  orders[index] = {
-    ...orders[index],
+  const updated: Order = {
+    ...existing,
     ...updates,
-    id: orders[index].id,
-    createdAt: orders[index].createdAt,
+    id: existing.id,
+    createdAt: existing.createdAt,
     updatedAt: new Date().toISOString(),
   };
 
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
-  return orders[index];
+  await put(orderPath(id), JSON.stringify(updated), {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "application/json",
+  });
+
+  return updated;
 }
 
-export function deleteOrder(id: string): boolean {
-  const orders = getOrders();
-  const filtered = orders.filter((o) => o.id !== id);
-  if (filtered.length === orders.length) return false;
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(filtered, null, 2));
-  return true;
+export async function deleteOrder(id: string): Promise<boolean> {
+  try {
+    const { blobs } = await list({ prefix: orderPath(id) });
+    if (blobs.length === 0) return false;
+
+    await del(blobs[0].url);
+    return true;
+  } catch {
+    return false;
+  }
 }
