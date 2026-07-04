@@ -52,9 +52,10 @@ export async function PATCH(
     }
 
     return NextResponse.json({ order });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to update order" },
+      { error: "Failed to update order", details: message },
       { status: 500 }
     );
   }
